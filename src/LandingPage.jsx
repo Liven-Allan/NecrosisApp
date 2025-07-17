@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { FaCloudUploadAlt, FaFolderOpen, FaUserCircle, FaHistory, FaSearch, FaDownload, FaChevronLeft, FaChevronRight, FaEye, FaEyeSlash, FaTimes, FaTrash, FaCog, FaSignOutAlt, FaMinus, FaUser, FaPlus, FaEdit } from 'react-icons/fa';
+import { FaCloudUploadAlt, FaFolderOpen, FaUserCircle, FaHistory, FaSearch, FaDownload, FaChevronLeft, FaChevronRight, FaEye, FaEyeSlash, FaTimes, FaTrash, FaCog, FaSignOutAlt, FaMinus, FaUser } from 'react-icons/fa';
 import './LandingPage.css';
 import cassavaIcon from '../../UI files/cassava.png';
 import { useNavigate } from 'react-router-dom';
@@ -50,7 +50,6 @@ const LandingPage = () => {
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileNeedsAttention, setProfileNeedsAttention] = useState(false);
-  const [editSessionModal, setEditSessionModal] = useState({ open: false, session: null, value: '' });
 
   // Show toast helper
   const showToast = (message, type = 'success') => {
@@ -382,28 +381,6 @@ const LandingPage = () => {
     setHistoryLoadingSession(null);
   };
 
-  // Handler to open edit modal
-  const handleEditSessionName = (session) => {
-    const defaultName = session.session_name || (session.created_at ? new Date(session.created_at).toLocaleString() : '');
-    setEditSessionModal({ open: true, session, value: defaultName });
-  };
-  // Handler to save session name
-  const handleSaveSessionName = async () => {
-    if (!editSessionModal.session) return;
-    try {
-      const token = localStorage.getItem('token');
-      await axios.patch(`/api/sessions/${editSessionModal.session.session_id}/name/`, { session_name: editSessionModal.value }, {
-        headers: { Authorization: `Token ${token}` },
-      });
-      // Update UI
-      setUserSessions((prev) => prev.map(s => s.session_id === editSessionModal.session.session_id ? { ...s, session_name: editSessionModal.value } : s));
-      setEditSessionModal({ open: false, session: null, value: '' });
-      showToast('Session name updated!', 'success');
-    } catch (err) {
-      showToast('Failed to update session name.', 'error');
-    }
-  };
-
   // Keyboard navigation for zoom modal
   useEffect(() => {
     if (zoomedImageIndex === null) return;
@@ -531,17 +508,9 @@ const LandingPage = () => {
                     style={{ cursor: 'pointer', opacity: historyLoadingSession === item.session_id ? 0.6 : 1 }}
                   >
                     <div className="history-block-left">
-                      <div className="history-block-date">{item.session_name || (item.created_at ? new Date(item.created_at).toLocaleString() : '')}</div>
+                      <div className="history-block-date">{new Date(item.created_at).toLocaleString()}</div>
                       <div className="history-block-images">{item.num_images} images analyzed</div>
                     </div>
-                    <button
-                      className="history-block-edit"
-                      title="Edit session name"
-                      onClick={e => { e.stopPropagation(); handleEditSessionName(item); }}
-                      style={{ marginRight: 6 }}
-                    >
-                      <FaEdit size={16} />
-                    </button>
                     <button
                       className="history-block-trash"
                       title="Delete"
@@ -670,70 +639,7 @@ const LandingPage = () => {
           <h1 className="landing-main-title">CASSAVA NECROSIS ANALYSER</h1>
         )}
         {/* Results View */}
-        {showResults && currentSessionId && selectedImages.length === 0 && pendingImages.length === 0 ? (
-          <div className="history-record-results-view">
-            <div className="history-record-header">
-              <div className="history-record-title">
-                {(() => {
-                  // Find the current session in userSessions to get the latest session_name
-                  const session = userSessions.find(s => s.session_id === currentSessionId);
-                  return session && session.session_name
-                    ? session.session_name
-                    : (currentSessionDate ? new Date(currentSessionDate).toLocaleString() : 'Analysis Record');
-                })()}
-              </div>
-              <div className="history-record-count">
-                {analysisResults.length} image{analysisResults.length !== 1 ? 's' : ''} analyzed
-              </div>
-            </div>
-            <div className="history-record-list-container">
-              {(() => {
-                // Always use two columns, split results evenly
-                const mid = Math.ceil(analysisResults.length / 2);
-                const columns = [
-                  analysisResults.slice(0, mid),
-                  analysisResults.slice(mid)
-                ];
-                return (
-                  <div className="history-record-list-columns">
-                    {columns.map((col, colIdx) => (
-                      <div className="history-record-list-col" key={colIdx}>
-                        {col.map((result, idx) => {
-                          const globalIdx = colIdx === 0 ? idx + 1 : mid + idx + 1;
-                          return (
-                            <div className="history-record-list-item" key={globalIdx}>
-                              <div className="history-record-list-number">{globalIdx}.</div>
-                              <div className="history-record-list-fields">
-                                <div className="history-record-list-row">
-                                  <span className="history-record-list-label">Image Name:</span>
-                                  <span className="history-record-list-value image-name" title={result.filename}>{result.filename}</span>
-                                </div>
-                                <div className="history-record-list-row">
-                                  <span className="history-record-list-label">Total Lesions:</span>
-                                  <span className={`history-record-list-value ${result.lesion_count <= 5 ? 'lesion-green' : 'lesion-red'}`}>{result.lesion_count}</span>
-                                </div>
-                                <div className="history-record-list-row">
-                                  <span className="history-record-list-label">Necrosis Percentage:</span>
-                                  <span className={`history-record-list-value ${Number(result.percentage_necrosis) < 36 ? 'necrosis-green' : Number(result.percentage_necrosis) < 65 ? 'necrosis-orange' : 'necrosis-red'}`}>{Number(result.percentage_necrosis).toFixed(2)}%</span>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ))}
-                  </div>
-                );
-              })()}
-            </div>
-            <div className="history-record-download-btn-row">
-              <button className="results-download-btn" onClick={handleDownloadResultsCSV}>
-                <FaDownload className="download-icon" size={18} />
-                <span>Download Results</span>
-              </button>
-            </div>
-          </div>
-        ) : showResults ? (
+        {showResults ? (
           <div className="landing-results-view">
             {/* Pending images preview row and submit button if there are pending images */}
             {pendingImages.length > 0 && (
@@ -761,13 +667,17 @@ const LandingPage = () => {
             {/* Analysis Results Cards - grid layout handled by CSS Grid */}
             <div className="landing-results-cards-container">
               <div className="landing-results-cards-scroll">
+                {/* Centered badge in the grid, spanning both columns */}
+                {/* Removed image-count-badge from here */}
+               
                 {pagedResults.map((result, idx) => (
                   <div className={`landing-results-card${!result.result_image ? ' no-image' : ''}`} key={idx}>
+                    {/* Only render image section if result_image exists */}
                     {result.result_image && (
                       <div className="landing-results-image" style={{ cursor: 'zoom-in' }} onClick={() => setZoomedImageIndex(resultsPage * CARDS_PER_PAGE + idx)}>
                         <img src={result.result_image} alt={result.filename} className="landing-results-img" />
-                      </div>
-                    )}
+                        </div>
+                      )}
                     <div className="landing-results-info">
                       <div className="landing-results-title">Analysis Results</div>
                       <div className="landing-results-field">
@@ -786,6 +696,7 @@ const LandingPage = () => {
                   </div>
                 ))}
               </div>
+              
             </div>
             {totalPages > 1 && (
               <div className="results-page-numbers">
@@ -814,6 +725,7 @@ const LandingPage = () => {
                 ))}
               </div>
             )}
+            {/* Download All Results Button (inactive for now) */}
             <button className="results-download-btn" onClick={handleDownloadResultsCSV} style={{ margin: '32px auto 0 auto', display: 'block' }}>
               <FaDownload className="download-icon" size={18} />
               <span>Download Results</span>
@@ -890,7 +802,7 @@ const LandingPage = () => {
             onClick={() => setShowUploadContainer(true)}
             title="Show upload container"
           >
-            <FaPlus size={26} color="#066D12" />
+            <FaEye size={26} color="#066D12" />
           </button>
         )}
       </div>
@@ -906,26 +818,6 @@ const LandingPage = () => {
             <div className="modal-actions">
               <button className="modal-btn modal-cancel" onClick={handleCancelDelete}>Cancel</button>
               <button className="modal-btn modal-confirm" onClick={handleConfirmDelete}>Delete</button>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* Edit Session Name Modal */}
-      {editSessionModal.open && (
-        <div className="modal-overlay" onClick={() => setEditSessionModal({ open: false, session: null, value: '' })}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-title" style={{ color: '#066D12' }}>Edit Session Name</div>
-            <input
-              className="profile-value profile-input"
-              type="text"
-              value={editSessionModal.value}
-              onChange={e => setEditSessionModal({ ...editSessionModal, value: e.target.value })}
-              style={{ width: '100%', marginBottom: 18 }}
-              maxLength={128}
-            />
-            <div className="modal-actions">
-              <button className="modal-btn modal-cancel" onClick={() => setEditSessionModal({ open: false, session: null, value: '' })}>Cancel</button>
-              <button className="modal-btn modal-confirm" onClick={handleSaveSessionName}>Save</button>
             </div>
           </div>
         </div>
