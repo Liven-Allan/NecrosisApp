@@ -51,6 +51,10 @@ const LandingPage = () => {
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileNeedsAttention, setProfileNeedsAttention] = useState(false);
   const [editSessionModal, setEditSessionModal] = useState({ open: false, session: null, value: '' });
+  const [showDeleteImagesModal, setShowDeleteImagesModal] = useState(false);
+  const [deleteImagesCallback, setDeleteImagesCallback] = useState(null);
+  const [deleteSessionId, setDeleteSessionId] = useState(null);
+  const [downloadingImages, setDownloadingImages] = useState(false);
 
   // Show toast helper
   const showToast = (message, type = 'success') => {
@@ -288,8 +292,46 @@ const LandingPage = () => {
     { id: 2, date: '2024-06-09 10:15', images: 12 },
   ];
 
+  // Helper to trigger the modal before deleting images
+  const confirmDeleteImages = (sessionId, callback) => {
+    setDeleteSessionId(sessionId);
+    setDeleteImagesCallback(() => callback);
+    setShowDeleteImagesModal(true);
+  };
+  // Download images as ZIP
+  const handleDownloadImages = async () => {
+    if (!deleteSessionId) return;
+    setDownloadingImages(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`/api/sessions/${deleteSessionId}/download_images/`, {
+        headers: { Authorization: `Token ${token}` },
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `session_${deleteSessionId}_images.zip`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+      setDownloadingImages(false);
+      showToast('Images downloaded!', 'success');
+    } catch (err) {
+      setDownloadingImages(false);
+      showToast('Failed to download images.', 'error');
+    }
+  };
+
   // Log out handler
   const handleLogout = async () => {
+    if (selectedImages.length > 0 || (analysisResults && analysisResults.some(r => r.result_image))) {
+      confirmDeleteImages(currentSessionId, proceedLogout);
+      return;
+    }
+    proceedLogout();
+  };
+  const proceedLogout = async () => {
     const token = localStorage.getItem('token');
     if (token) {
       try {
@@ -303,12 +345,11 @@ const LandingPage = () => {
     localStorage.removeItem('userEmail');
     localStorage.removeItem('token');
     setShowUserAccount(false);
-    // Remove images from UI but keep text results
     setAnalysisResults(prev => prev.map(r => ({ ...r, result_image: null })));
     setSelectedImages([]);
     setPendingImages([]);
     setShowResults(true);
-    navigate('/'); // Go back to login page
+    navigate('/');
   };
 
   // Handler for trash bin click
@@ -358,6 +399,13 @@ const LandingPage = () => {
 
   // Handler to fetch and show results for a session from history
   const handleShowSessionResults = async (session) => {
+    if (selectedImages.length > 0 || (analysisResults && analysisResults.some(r => r.result_image))) {
+      confirmDeleteImages(currentSessionId, () => proceedShowSessionResults(session));
+      return;
+    }
+    proceedShowSessionResults(session);
+  };
+  const proceedShowSessionResults = async (session) => {
     setHistoryLoadingSession(session.session_id);
     setAnalysisError('');
     try {
@@ -373,7 +421,7 @@ const LandingPage = () => {
       setPendingImages([]);
       setResultsPage(0);
       setShowHistory(false);
-      setShowUploadContainer(true); // Always show upload UI after loading session
+      setShowUploadContainer(true);
       showToast('Session results loaded. You can upload more images to this session.', 'success');
     } catch (err) {
       setAnalysisError('Failed to load session results.');
@@ -926,6 +974,21 @@ const LandingPage = () => {
             <div className="modal-actions">
               <button className="modal-btn modal-cancel" onClick={() => setEditSessionModal({ open: false, session: null, value: '' })}>Cancel</button>
               <button className="modal-btn modal-confirm" onClick={handleSaveSessionName}>Save</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showDeleteImagesModal && (
+        <div className="modal-overlay" onClick={() => setShowDeleteImagesModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-title" style={{ color: '#d32f2f' }}>Delete Images?</div>
+            <div className="modal-message">You are about to delete all images for this session. Would you like to download them first?</div>
+            <div className="modal-actions">
+              <button className="modal-btn modal-cancel" onClick={() => setShowDeleteImagesModal(false)}>Cancel</button>
+              <button className="modal-btn" onClick={handleDownloadImages} disabled={downloadingImages} style={{ background: '#066D12', color: '#fff' }}>
+                {downloadingImages ? 'Downloading...' : 'Download Images'}
+              </button>
+              <button className="modal-btn modal-confirm" onClick={() => { setShowDeleteImagesModal(false); if (deleteImagesCallback) deleteImagesCallback(); }}>Delete Images</button>
             </div>
           </div>
         </div>
