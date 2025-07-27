@@ -213,8 +213,9 @@ const LandingPage = () => {
             ...(token && { Authorization: `Token ${token}` }),
           },
         });
+        console.log('Analysis response:', res.data); // Debug response
         // Append new results to existing ones
-        setAnalysisResults(prev => [...prev, ...res.data.results]);
+        setAnalysisResults(prev => [...prev, ...(res.data.results || [])]);
         setShowResults(true);
         setResultsPage(0);
         // Update session state from response
@@ -228,8 +229,10 @@ const LandingPage = () => {
       } catch (err) {
         setAnalysisError('Failed to analyze images. Please try again.');
         showToast('Failed to analyze images. Please try again.', 'error');
+        console.error('Analysis error:', err); // Debug error
+      } finally {
+        setAnalysisLoading(false); // Always reset loading state
       }
-      setAnalysisLoading(false);
     } else {
       setShowResults(true);
       setResultsPage(0);
@@ -238,6 +241,14 @@ const LandingPage = () => {
 
   // Handler for 'Add New Analysis' button
   const handleAddNewAnalysis = () => {
+    if (selectedImages.length > 0 || (analysisResults && analysisResults.some(r => r.result_image))) {
+      confirmDeleteImages(currentSessionId, proceedAddNewAnalysis);
+      return;
+    }
+    proceedAddNewAnalysis();
+  };
+  // Actual logic for starting a new analysis session
+  const proceedAddNewAnalysis = () => {
     setSelectedImages([]);
     setPendingImages([]);
     setAnalysisResults([]);
@@ -247,7 +258,8 @@ const LandingPage = () => {
     setCurrentSessionDate(null);
     setResultsPage(0);
     setShowHistory(false);
-    setShowUploadContainer(true); // Ensure upload UI is visible
+    setShowUploadContainer(true);
+    setAnalysisLoading(false);
     showToast('Ready for a new analysis session!', 'success');
   };
 
@@ -734,45 +746,43 @@ const LandingPage = () => {
                 {analysisResults.length} image{analysisResults.length !== 1 ? 's' : ''} analyzed
               </div>
             </div>
-            <div className="history-record-list-container">
-              {(() => {
-                // Always use two columns, split results evenly
-                const mid = Math.ceil(analysisResults.length / 2);
-                const columns = [
-                  analysisResults.slice(0, mid),
-                  analysisResults.slice(mid)
-                ];
-                return (
-                  <div className="history-record-list-columns">
-                    {columns.map((col, colIdx) => (
-                      <div className="history-record-list-col" key={colIdx}>
-                        {col.map((result, idx) => {
-                          const globalIdx = colIdx === 0 ? idx + 1 : mid + idx + 1;
-                          return (
-                            <div className="history-record-list-item" key={globalIdx}>
-                              <div className="history-record-list-number">{globalIdx}.</div>
-                              <div className="history-record-list-fields">
-                                <div className="history-record-list-row">
-                                  <span className="history-record-list-label">Image Name:</span>
-                                  <span className="history-record-list-value image-name" title={result.filename}>{result.filename}</span>
-                                </div>
-                                <div className="history-record-list-row">
-                                  <span className="history-record-list-label">Total Lesions:</span>
-                                  <span className={`history-record-list-value ${result.lesion_count <= 5 ? 'lesion-green' : 'lesion-red'}`}>{result.lesion_count}</span>
-                                </div>
-                                <div className="history-record-list-row">
-                                  <span className="history-record-list-label">Necrosis Percentage:</span>
-                                  <span className={`history-record-list-value ${Number(result.percentage_necrosis) < 36 ? 'necrosis-green' : Number(result.percentage_necrosis) < 65 ? 'necrosis-orange' : 'necrosis-red'}`}>{Number(result.percentage_necrosis).toFixed(2)}%</span>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ))}
-                  </div>
-                );
-              })()}
+            {/* History Record Results Table View - replaces previous card/column layout */}
+            <div className="history-record-table-container">
+              {/* Table for displaying all analysis results in a single scrollable view */}
+              <table className="history-record-table">
+                <thead>
+                  <tr>
+                    <th>No</th>
+                    <th>Image Name</th>
+                    <th>Total Lesions</th>
+                    <th>Necrosis Percentage</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {analysisResults.map((result, idx) => (
+                    <tr key={idx}>
+                      {/* Numbering for each record */}
+                      <td>{idx + 1}</td>
+                      {/* Truncated image name with tooltip for full name */}
+                      <td title={result.filename} className="truncate">{result.filename}</td>
+                      {/* Lesion count with color coding */}
+                      <td className={result.lesion_count <= 5 ? 'lesion-green' : 'lesion-red'}>
+                        {result.lesion_count}
+                      </td>
+                      {/* Necrosis percentage with color coding */}
+                      <td className={
+                        Number(result.percentage_necrosis) < 36
+                          ? 'necrosis-green'
+                          : Number(result.percentage_necrosis) < 65
+                          ? 'necrosis-orange'
+                          : 'necrosis-red'
+                      }>
+                        {Number(result.percentage_necrosis).toFixed(2)}%
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
             <div className="history-record-download-btn-row">
               <button className="results-download-btn" onClick={handleDownloadResultsCSV}>
