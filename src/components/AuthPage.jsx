@@ -80,9 +80,9 @@ const AuthPage = () => {
   };
 
   // Login validation helpers
-  const validateLoginUsername = (username) => {
-    if (!username) return 'Username is required.';
-    if (!/^[A-Za-z]+$/.test(username)) return 'Username must contain only letters.';
+  const validateLoginEmail = (email) => {
+    if (!email) return 'Email is required.';
+    if (!/^\S+@\S+\.\S+$/.test(email)) return 'Invalid email format.';
     return '';
   };
   const validateLoginPassword = (password) => {
@@ -141,7 +141,7 @@ const AuthPage = () => {
     setLoginLoading(true);
     // Validate fields
     const errors = {};
-    errors.username = validateLoginUsername(loginEmail);
+    errors.email = validateLoginEmail(loginEmail);
     errors.password = validateLoginPassword(loginPassword);
     setLoginErrors(errors);
     if (Object.values(errors).some(Boolean)) {
@@ -150,20 +150,20 @@ const AuthPage = () => {
     }
     // Submit to backend
     try {
-      // DRF obtain_auth_token expects username (not email) by default
+      // Backend expects email for login
       const res = await axios.post('/api/login/', {
-        username: loginEmail,
+        email: loginEmail,
         password: loginPassword,
       });
       // On success, store token if needed, then navigate
-      // Store username and fetch email for profile popup
-      localStorage.setItem('username', loginEmail);
-      // Fetch user details (email) from backend
+      // Store email and fetch user details for profile popup
+      localStorage.setItem('userEmail', loginEmail);
+      // Fetch user details (username) from backend
       try {
         const userRes = await axios.get(`/api/user/${loginEmail}/`, {
           headers: { Authorization: `Token ${res.data.token}` },
         });
-        localStorage.setItem('userEmail', userRes.data.email);
+        localStorage.setItem('username', userRes.data.username);
         localStorage.setItem('token', res.data.token); // Store token for future authenticated requests
       } catch (userErr) {
         // Show an error and redirect to login if fetching user details fails
@@ -221,13 +221,13 @@ const AuthPage = () => {
           </div>
           {activeTab === 'login' ? (
             <form className="signup-form" onSubmit={handleLogin}>
-              <label className="input-label">Username</label>
+              <label className="input-label">Email</label>
               <div className="form-section">
                 <div className="input-row">
-                  <FaUser className="input-icon" />
-                  <input type="text" placeholder="Enter your username" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} />
+                  <FaEnvelope className="input-icon" />
+                  <input type="email" placeholder="Enter your email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} />
                 </div>
-                {loginErrors.username && <div className="error-message">{loginErrors.username}</div>}
+                {loginErrors.email && <div className="error-message">{loginErrors.email}</div>}
               </div>
               <label className="input-label">Password</label>
               <div className="form-section">
