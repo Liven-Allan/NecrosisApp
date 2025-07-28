@@ -6,6 +6,7 @@ import cassavaRoots from '../../UI files/cassava-roots.jpg';
 import './SignUpPage.css';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import Modal from 'react-modal';
 
 const AuthPage = () => {
   const [activeTab, setActiveTab] = useState('login');
@@ -184,6 +185,68 @@ const AuthPage = () => {
     setLoginLoading(false);
   };
 
+  const [showForgotModal, setShowForgotModal] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotNewPassword, setForgotNewPassword] = useState('');
+  const [forgotConfirmPassword, setForgotConfirmPassword] = useState('');
+  const [forgotErrors, setForgotErrors] = useState({});
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotSuccess, setForgotSuccess] = useState('');
+  const [showForgotNewPassword, setShowForgotNewPassword] = useState(false);
+  const [showForgotConfirmPassword, setShowForgotConfirmPassword] = useState(false);
+
+  const validateForgotEmail = (email) => {
+    if (!email) return 'Email is required.';
+    if (!/^\S+@\S+\.\S+$/.test(email)) return 'Invalid email format.';
+    return '';
+  };
+  const validateForgotPassword = (password) => {
+    if (!password) return 'Password is required.';
+    if (password.length < 8) return 'Password must be at least 8 characters.';
+    if (!/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) return 'Password must contain letters and numbers.';
+    return '';
+  };
+  const validateForgotConfirmPassword = (password, confirmPassword) => {
+    if (!confirmPassword) return 'Please confirm your password.';
+    if (password !== confirmPassword) return 'Passwords do not match.';
+    return '';
+  };
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    setForgotSuccess('');
+    setForgotLoading(true);
+    // Validate fields
+    const errors = {};
+    errors.email = validateForgotEmail(forgotEmail);
+    errors.new_password = validateForgotPassword(forgotNewPassword);
+    errors.confirm_password = validateForgotConfirmPassword(forgotNewPassword, forgotConfirmPassword);
+    setForgotErrors(errors);
+    if (Object.values(errors).some(Boolean)) {
+      setForgotLoading(false);
+      return;
+    }
+    // Call backend
+    try {
+      await axios.post('/api/reset_password/', {
+        email: forgotEmail,
+        new_password: forgotNewPassword,
+        confirm_password: forgotConfirmPassword,
+      });
+      setForgotSuccess('Password updated successfully! You can now log in.');
+      setForgotEmail('');
+      setForgotNewPassword('');
+      setForgotConfirmPassword('');
+      setForgotErrors({});
+    } catch (err) {
+      if (err.response && err.response.data) {
+        setForgotErrors(err.response.data);
+      } else {
+        setForgotErrors({ general: 'Password reset failed. Please try again.' });
+      }
+    }
+    setForgotLoading(false);
+  };
+
   return (
     <div className="signup-container">
       <div className="signup-book">
@@ -246,7 +309,7 @@ const AuthPage = () => {
                 {loginErrors.password && <div className="error-message">{loginErrors.password}</div>}
               </div>
               <div className="forgot-row">
-                <a href="#" className="forgot-link">Forgot password?</a>
+                <a href="#" className="forgot-link" onClick={e => { e.preventDefault(); setShowForgotModal(true); }}>Forgot password?</a>
               </div>
               {loginErrors.general && <div className="error-message">{loginErrors.general}</div>}
             </form>
@@ -360,6 +423,91 @@ const AuthPage = () => {
           </form>
         </div>
       </div>
+
+      <Modal
+        isOpen={showForgotModal}
+        onRequestClose={() => setShowForgotModal(false)}
+        className="signup-container"
+        overlayClassName="modal-overlay"
+        ariaHideApp={false}
+      >
+        <div className="signup-book">
+          <div className="signup-left-page">
+            <div className="signup-logo-container">
+              <div className="signup-logo">
+                <FaLock size={32} color="#066D12" />
+              </div>
+            </div>
+            <div className="signup-header">
+              <h2>Reset Password</h2>
+            </div>
+            <form className="signup-form" id="forgot-password-form" onSubmit={handleForgotPassword}>
+              <label className="input-label">Email</label>
+              <div className="form-section">
+                <div className="input-row">
+                  <FaEnvelope className="input-icon" />
+                  <input type="email" placeholder="Enter your email" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} />
+                </div>
+                {forgotErrors.email && <div className="error-message">{forgotErrors.email}</div>}
+              </div>
+              <label className="input-label">New Password</label>
+              <div className="form-section">
+                <div className="input-row">
+                  <FaLock className="input-icon" />
+                  <input
+                    type={showForgotNewPassword ? 'text' : 'password'}
+                    placeholder="Enter new password"
+                    value={forgotNewPassword}
+                    onChange={e => setForgotNewPassword(e.target.value)}
+                  />
+                  <span className="input-eye" onClick={() => setShowForgotNewPassword(v => !v)} tabIndex={0} role="button" aria-label="Toggle new password visibility">
+                    {showForgotNewPassword ? <FaEyeSlash /> : <FaEye />}
+                  </span>
+                </div>
+                {forgotErrors.new_password && <div className="error-message">{forgotErrors.new_password}</div>}
+              </div>
+              <label className="input-label">Confirm Password</label>
+              <div className="form-section">
+                <div className="input-row">
+                  <FaLock className="input-icon" />
+                  <input
+                    type={showForgotConfirmPassword ? 'text' : 'password'}
+                    placeholder="Confirm new password"
+                    value={forgotConfirmPassword}
+                    onChange={e => setForgotConfirmPassword(e.target.value)}
+                  />
+                  <span className="input-eye" onClick={() => setShowForgotConfirmPassword(v => !v)} tabIndex={0} role="button" aria-label="Toggle confirm password visibility">
+                    {showForgotConfirmPassword ? <FaEyeSlash /> : <FaEye />}
+                  </span>
+                </div>
+                {forgotErrors.confirm_password && <div className="error-message">{forgotErrors.confirm_password}</div>}
+              </div>
+              {forgotErrors.general && <div className="error-message">{forgotErrors.general}</div>}
+              {forgotSuccess && <div className="success-message">{forgotSuccess}</div>}
+            </form>
+          </div>
+          <div className="signup-right-page" style={{ backgroundImage: `url(${cassavaRoots})` }}>
+            <div className="signup-right-form">
+              <button
+                type="submit"
+                form="forgot-password-form"
+                className="signup-button full-width"
+                disabled={forgotLoading}
+              >
+                {forgotLoading ? 'Updating...' : 'Create New Password'}
+              </button>
+              <button
+                type="button"
+                className="signup-button full-width"
+                style={{ marginTop: 8 }}
+                onClick={() => setShowForgotModal(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

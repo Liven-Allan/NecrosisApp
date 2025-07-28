@@ -375,6 +375,10 @@
   font-weight: 500;
 }
 
+.modal-overlay {
+  background: #fff !important;
+}
+
 @media (max-width: 900px) {
   .signup-book {
     flex-direction: column;
